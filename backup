@@ -1,0 +1,131 @@
+function respond(res, status_code, payload={}){
+	res.send(JSON.stringify({status:status_code, payload:payload}));
+}
+
+/*
+Return code:
+-4:Error retrieving token from database
+-3:Error clearing otac from database
+-2:Error updating token to database
+0:Credentials dont match
+1:Success
+*/ 
+app.get('/auth', (req, res)=>{
+	const phone_number = req.query.phone_number;
+	const otac = req.query.otac;
+	const keepSessionsAlive = req.query.keepSessionsAlive||0;
+
+
+	
+	//const token = crypto.createHash('md5').update(verif_code).digest('hex');
+
+	query = `SELECT status, username FROM users WHERE phone_number='${phone_number}' AND otac='${otac}'`;
+
+	db.query(query, (err, result)=>{
+		if(result.rows.length > 0){
+			// Cred matches
+
+			// Clear otac
+			db.query(`UPDATE users SET otac=0 WHERE phone_number='${phone_number}'`, (err1, result1)=>{
+				if(err1){
+					respond(res, -3)
+				}
+			})
+
+			if(keepSessionsAlive==0){
+				// Generate new token 
+				const token = genToken();
+				// Update database
+				db.query(`UPDATE users SET token='${token}' WHERE phone_number='${phone_number}'`, (err1, result1)=>{
+					if(err1){
+						respond(res, -2);
+					}else{
+						respond(res, 1, {token:token});
+					}
+				});
+			}else{
+				// return token
+				db.query(`SELECT token FROM users WHERE phone_number='${phone_number}'`, (err1, result1)=>{
+					if(err1){
+						respond(res, -4);
+					}else{
+						respond(res, 1, {token:result1.rows[0].token});
+					}
+				});
+			}
+
+		}else {
+			// Creds dont match
+			respond(res, 0);
+		}	
+	})
+	
+})
+
+
+/*
+Return code:
+-2 : Phone number param is missing 
+-1 : Error updating otac in database
+1 : OK
+*/
+app.post('/auth/send-sms', (req, res)=>{
+	// check if 
+	const phone_number = req.query.phone_number;
+	if(!phone_number){
+		respond(res, -2);
+	}
+	const otac = genOTAC(); // Generate random one-time-auth code
+
+	// Send otac code via SMS
+
+	sendOTAC(phone_number, otac);
+
+	// check if phone number already exists
+	checkExistance(db, phone_number, ()=>{
+		// If account already exists
+		query = `UPDATE users SET otac=${otac} WHERE phone_number='${phone_number}'`;
+		db.query(query, (err, result)=>{
+			if(err){
+				respond(res, -1);
+			}else{
+				respond(res, 1);
+			}
+		})
+
+	}, ()=>{
+		// create new account
+		query = `INSERT INTO users (phone_number, otac) VALUES ('${phone_number}', ${otac})`;
+		db.query(query, (err, result)=>{
+			if(err){
+				respond(res, -1);
+			}else{
+				respond(res, 1);
+			}
+		});
+	})
+	
+})
+
+
+/*
+Return code:
+- : Phone number param is missing 
+-1 : Error updating otac in database
+1 : OK
+*/
+app.get('/auth/registred', (req, res)=>{
+	const phone_number = req.query.phone_number;
+	query = `SELECT phone_number FROM users WHERE phone_number='${phone_number}'`;
+	db.query(query, (err, result)=>{
+		if(err){
+			respond(res, -1);
+		}
+		if(result.rows.length==0){
+			respond(res, 0); // does not exist
+		}else{
+			respond(res, 2); // exist
+		}
+	})
+})
+
