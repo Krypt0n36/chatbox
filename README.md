@@ -22,17 +22,22 @@ Trust cryptography not centralisation.
 ## END-POINTS DOCUMENTATION
 
 ### /register [POST]
-####Params :
+#### Description :
+This end-points is called to initiate the registration (New used joining) procedure, it saves the client's identifier (hashed username) in the database for future message broadcasting purposes.
+The client can choose to save both of his generated RSA keypair on the server clusters. 
+Important : If you utilize the server's keypairs-cluster storage you should encrypt your public key.
+
+#### Params :
   - identifier : Identifier, username hash using SHA256.
   - publicKey : RSA public key (including header)
   - savePrivateKey : Binary, (0:No, 1:Yes). Save private key in the keypair clauster.
-  - encPrivateKey (Required if savePrivateKey is used): Encrypted private key, encryption algorithm may varry depends on the client (AES256 is suggested).
+  - encPrivateKey (Required if savePrivateKey is used): Encrypted RSA private key, encryption algorithm may varry depends on the client (AES256 is suggested).
  
-####Response (JSON):
+#### Response (JSON):
   - status : Status or return code.
   - label : Status detials
 
-####Possible return codes:
+#### Possible return codes:
   - 1  : Success.
   - -1 : Username/identifier is taken (Already reserved in the database).
   - -2 : Database error encountered during registring username in the database.
